@@ -1,0 +1,108 @@
+rules_version = '2';
+
+// ─── FIRESTORE SECURITY RULES ─────────────────────────────────────────────────
+// A Little Journey — Production Security Rules
+// Updated: 2026
+// ──────────────────────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── HELPER FUNCTIONS ──────────────────────────────────────────────────────
+
+    // Check if the requesting user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the authenticated user is the creator of a journey link
+    function isLinkCreator(linkId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/links/$(linkId)) &&
+        get(/databases/$(database)/documents/links/$(linkId)).data.createdBy == request.auth.uid;
+    }
+
+    // Validate that only allowed fields are present in incoming data
+    function hasOnlyAllowedVisitorFields() {
+      let allowed = [
+        'visitorId', 'linkId', 'createdAt', 'lastUpdatedAt',
+        'arrivalTime',
+        'locationPermission', 'latitude', 'longitude', 'locationAccuracy',
+        'distanceKm', 'roadDistanceKm',
+        'deviceType', 'browser', 'platform',
+        'screenWidth', 'screenHeight', 'language', 'timezone',
+        'choiceOne', 'choiceTwo',
+        'cameraPermission', 'videoUrl',
+        'microphonePermission', 'voiceUrl',
+        'journeyProgress', 'journeyCompleted'
+      ];
+      return request.resource.data.keys().hasOnly(allowed);
+    }
+
+    // ── LINKS COLLECTION ──────────────────────────────────────────────────────
+    // Only authenticated admins can create or modify journey links.
+    // Anyone can read an active link (needed to load journey document).
+
+    match /links/{linkId} {
+
+      // Public read: visitor needs to verify the link is valid and active.
+      // The linkId is already random and secret (12-char unguessable ID).
+      allow read: if true;
+
+      // Only authenticated users can create a journey link
+      allow create: if isAuthenticated()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.keys().hasAll(['linkId', 'createdBy', 'createdAt', 'active'])
+        && request.resource.data.linkId is string
+        && request.resource.data.active is bool;
+
+      // Only the creator can update or delete a journey link
+      allow update, delete: if isAuthenticated()
+        && resource.data.createdBy == request.auth.uid;
+
+      // ── VISITORS SUBCOLLECTION ─────────────────────────────────────────────
+      // Visitors can create / update ONLY their own document.
+      // Visitors cannot read other visitors' documents.
+      // Admins (link creators) can read, update, and delete visitor documents.
+
+      match /visitors/{visitorId} {
+
+        // Visitor can read their own document only
+        allow read: if
+          // Visitor reading their own doc (matched by stored visitorId field)
+          (request.auth == null && resource.data.visitorId == visitorId)
+          // Or authenticated admin
+          || isLinkCreator(linkId);
+
+        // Visitor can create their own document
+        allow create: if
+          hasOnlyAllowedVisitorFields()
+          && request.resource.data.visitorId == visitorId
+          && request.resource.data.linkId == linkId
+          // Prevent visitors from spoofing an admin-controlled myLatitude field
+          && !('myLatitude' in request.resource.data)
+          && !('myLongitude' in request.resource.data);
+
+        // Visitor can update their own document (progress updates, uploads, etc.)
+        allow update: if
+          // Visitors updating their own existing doc
+          (resource.data.visitorId == visitorId
+            && hasOnlyAllowedVisitorFields()
+            // Prevent changing linkId or visitorId after creation
+            && request.resource.data.linkId == resource.data.linkId
+            && request.resource.data.visitorId == resource.data.visitorId)
+          // Or authenticated admin
+          || isLinkCreator(linkId);
+
+        // Only authenticated admin can delete visitor data
+        allow delete: if isLinkCreator(linkId);
+      }
+    }
+
+    // ── DENY EVERYTHING ELSE ──────────────────────────────────────────────────
+    // Explicitly deny access to all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

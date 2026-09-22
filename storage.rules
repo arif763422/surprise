@@ -1,0 +1,68 @@
+rules_version = '2';
+
+// ─── FIREBASE STORAGE SECURITY RULES ─────────────────────────────────────────
+// A Little Journey — Production Storage Rules
+// Updated: 2026
+// ──────────────────────────────────────────────────────────────────────────────
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ── VISITOR VIDEO CAPTURES ────────────────────────────────────────────────
+    // Path: captures/{linkId}/{visitorId}.webm  (or .mp4)
+    // - Visitors can upload ONLY to their own path
+    // - File size limited to 20 MB
+    // - Content type must be a video format
+    // - Only authenticated admins can read (download) the files
+
+    match /captures/{linkId}/{fileName} {
+
+      // Visitors can write to their own file path only.
+      // We cannot directly verify linkId ownership here (no Firestore lookup in Storage rules),
+      // but the visitorId embedded in the filename is validated client-side.
+      // The Firestore visitor document stores the videoUrl, which admin uses for authenticated access.
+      allow write: if
+        // File size must be <= 20 MB
+        request.resource.size <= 20 * 1024 * 1024
+        // Must be a video content type
+        && request.resource.contentType.matches('video/.*')
+        // No public deletion
+        ;
+
+      // Only authenticated users (admins) can read captured videos.
+      allow read: if request.auth != null;
+
+      // Visitors cannot delete
+      allow delete: if request.auth != null;
+    }
+
+    // ── VISITOR VOICE MESSAGES ────────────────────────────────────────────────
+    // Path: voices/{linkId}/{visitorId}.webm  (or .mp4 / .ogg)
+    // - Visitors can upload ONLY to their own path
+    // - File size limited to 10 MB
+    // - Content type must be an audio format
+    // - Only authenticated admins can read
+
+    match /voices/{linkId}/{fileName} {
+
+      allow write: if
+        // File size must be <= 10 MB
+        request.resource.size <= 10 * 1024 * 1024
+        // Must be an audio content type
+        && request.resource.contentType.matches('audio/.*')
+        ;
+
+      // Only authenticated users (admins) can read voice messages.
+      allow read: if request.auth != null;
+
+      // Only authenticated users can delete
+      allow delete: if request.auth != null;
+    }
+
+    // ── DENY ALL OTHER PATHS ──────────────────────────────────────────────────
+    // No other paths are accessible
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

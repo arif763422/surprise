@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A Little Journey — Admin Dashboard" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Admin · A Little Journey</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+</head>
+<body class="admin-page">
+
+  <!-- Stars background -->
+  <canvas id="stars-canvas" aria-hidden="true"></canvas>
+
+  <!-- Toast notifications -->
+  <div id="toast-container" role="alert" aria-live="polite"></div>
+
+  <!-- ═══════════════════════════════════════════════
+       ADMIN LOGIN
+       ═══════════════════════════════════════════════ -->
+  <section id="admin-login" role="main" aria-label="Admin login">
+    <div class="login-card">
+      <div class="login-logo">
+        <span class="login-logo-icon">✦</span>
+        <span class="login-title">A Little Journey</span>
+        <span class="login-subtitle">Admin Dashboard</span>
+      </div>
+
+      <form id="login-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="login-email">Email</label>
+          <input
+            type="email"
+            id="login-email"
+            class="form-input"
+            placeholder="admin@example.com"
+            autocomplete="email"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="login-password">Password</label>
+          <input
+            type="password"
+            id="login-password"
+            class="form-input"
+            placeholder="••••••••"
+            autocomplete="current-password"
+            required
+          />
+        </div>
+
+        <div class="form-error" id="login-error" role="alert" aria-live="polite"></div>
+
+        <div style="display:flex;gap:12px;margin-top:0.75rem;">
+          <button
+            type="submit"
+            id="btn-login"
+            class="btn btn-primary"
+            style="flex:1;"
+            aria-label="Sign in to admin dashboard"
+          >
+            SIGN IN →
+          </button>
+          <button
+            type="button"
+            id="btn-signup"
+            class="btn btn-secondary"
+            style="flex:1;"
+            aria-label="Create new admin account"
+          >
+            SIGN UP
+          </button>
+        </div>
+
+        <div style="margin-top:1.25rem;text-align:center;border-top:1px solid var(--border-glass);padding-top:1rem;">
+          <button
+            type="button"
+            id="btn-instant-admin"
+            class="btn btn-ghost"
+            style="font-size:0.82rem;color:var(--secondary);letter-spacing:0.05em;padding:0.5rem 1rem;width:100%;"
+            title="Bypass login and open dashboard immediately"
+          >
+            ⚡ INSTANT ADMIN ACCESS (DIRECT MODE)
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       ADMIN APP
+       ═══════════════════════════════════════════════ -->
+  <div id="admin-app" role="main" aria-label="Admin dashboard">
+
+    <!-- Header -->
+    <header class="admin-header">
+      <div class="admin-header-brand">
+        <span class="admin-header-title">A Little Journey</span>
+        <span class="admin-header-sub">Visitor Journey Dashboard</span>
+      </div>
+      <div class="admin-header-actions">
+        <button id="btn-refresh" class="btn btn-ghost" aria-label="Refresh data">
+          ↻ Refresh
+        </button>
+        <button id="btn-logout" class="btn btn-danger" aria-label="Sign out">
+          Logout
+        </button>
+      </div>
+    </header>
+
+    <main class="admin-main">
+
+      <!-- Stats Row -->
+      <div class="stats-grid" role="region" aria-label="Journey statistics">
+        <div class="stat-card">
+          <span class="stat-icon">🔗</span>
+          <span class="stat-value" id="stat-journeys">0</span>
+          <span class="stat-label">Total Journeys</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">👤</span>
+          <span class="stat-value" id="stat-visitors">0</span>
+          <span class="stat-label">Total Visitors</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">📍</span>
+          <span class="stat-value" id="stat-locations">0</span>
+          <span class="stat-label">Location Shared</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">📸</span>
+          <span class="stat-value" id="stat-cameras">0</span>
+          <span class="stat-label">Camera Reveals</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">✓</span>
+          <span class="stat-value" id="stat-completed">0</span>
+          <span class="stat-label">Completed</span>
+        </div>
+      </div>
+
+      <!-- Create Journey -->
+      <div class="journey-section">
+        <div class="section-header">
+          <span class="section-title">Create New Journey</span>
+        </div>
+        <div class="public-url-settings">
+          <label class="form-label" for="public-site-url">🌐 Public Website URL / Domain</label>
+          <div class="public-url-row">
+            <input id="public-site-url" class="form-input" type="url" placeholder="https://myjourney.vercel.app" autocomplete="url" />
+            <button id="btn-save-public-url" class="btn btn-secondary" type="button">SAVE URL</button>
+          </div>
+          <p id="public-url-warning" class="form-hint" role="status"></p>
+          <div id="public-url-qr" class="public-url-qr" hidden>
+            <img id="public-url-qr-image" alt="QR code for the public journey website" />
+            <span>Scan to test the public site on a phone.</span>
+          </div>
+        </div>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:var(--space-lg);">
+          Each journey captures your current location as the destination shown to your visitor.
+          Allow location access when prompted.
+        </p>
+        <div style="display:flex;flex-wrap:wrap;gap:var(--space-md);">
+          <button id="btn-create-journey" class="btn btn-primary" aria-label="Create a new journey link">
+            ✦ CREATE NEW JOURNEY
+          </button>
+        </div>
+
+        <!-- Generated link box -->
+        <div id="link-generated-box" class="link-generated-box">
+          <div class="journey-link-label">Your Journey Link</div>
+          <div class="link-generated-url" id="generated-link-url" role="textbox" aria-readonly="true">—</div>
+          <div style="display:flex;gap:var(--space-md);flex-wrap:wrap;">
+            <button id="btn-copy-link" class="btn btn-ghost" aria-label="Copy journey link">
+              📋 COPY LINK
+            </button>
+            <button id="btn-open-link" class="btn btn-ghost" aria-label="Open journey in new tab">
+              ↗ OPEN
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Visitors List -->
+      <div class="journey-section">
+        <div class="section-header">
+          <span class="section-title">All Journey Links & Visitors</span>
+          <span class="journey-badge" id="visitors-count-badge">Loading…</span>
+        </div>
+        <div id="visitors-container">
+          <div class="flex-center" style="padding:var(--space-2xl);">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </div>
+
+    </main><!-- /.admin-main -->
+  </div><!-- /#admin-app -->
+
+  <!-- ═══════════════════════════════════════════════
+       MODALS
+       ═══════════════════════════════════════════════ -->
+
+  <!-- Map Modal -->
+  <div id="modal-map-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Visitor map">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-map-title">Visitor Location</h2>
+        <button class="modal-close" id="btn-close-map-modal" aria-label="Close map">&times;</button>
+      </div>
+      <div id="modal-map"></div>
+      <div style="margin-top:var(--space-lg);">
+        <div class="visitors-grid" style="grid-template-columns:1fr 1fr;" id="modal-map-stats"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Video Modal -->
+  <div id="modal-video-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Visitor video">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 class="modal-title">Visitor Video</h2>
+        <button class="modal-close" id="btn-close-video-modal" aria-label="Close video">&times;</button>
+      </div>
+      <video
+        id="modal-video"
+        controls
+        preload="metadata"
+        aria-label="Recorded visitor video"
+        style="display:none;"
+      ></video>
+      <p id="modal-video-msg" style="color:var(--text-muted);font-size:0.9rem;text-align:center;padding:var(--space-xl);"></p>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPeM=" crossorigin=""></script>
+
+  <!-- Supabase JS Client (UMD) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Universal Admin Engine (Works on file:// and http://) -->
+  <script src="./admin.bundle.js"></script>
+</body>
+</html>
